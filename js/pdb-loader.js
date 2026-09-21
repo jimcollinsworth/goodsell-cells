@@ -91,14 +91,12 @@ export function createRibosomeComplex(paletteName = 'ecoli', options = {}) {
   group.add(mesh30A);
 
   // 3. mRNA strand passing through active cleft
-  const mrnaPath = new THREE.CurvePath();
   const mrnaCurve = new THREE.CubicBezierCurve3(
     new THREE.Vector3(-14, -4, 0.4),
     new THREE.Vector3(-4, -6, 0.4),
     new THREE.Vector3(4, -4, 0.4),
     new THREE.Vector3(14, -2, 0.4)
   );
-  mrnaPath.add(mrnaCurve);
   const mrnaPoints = mrnaCurve.getPoints(30);
   const mrnaGeo = new THREE.BufferGeometry().setFromPoints(mrnaPoints);
   const mrnaMat = new THREE.LineBasicMaterial({
@@ -112,7 +110,7 @@ export function createRibosomeComplex(paletteName = 'ecoli', options = {}) {
 
 /**
  * ATP Synthase Complex (PDB: 6N2Y representation)
- * 2D Orthographic contoured assembly: F1 Head, Stalk, F0 Membrane Rotor
+ * 2D Orthographic contoured assembly: F0 Membrane Rotor (inner membrane) + F1 Catalytic Headpiece (cytoplasm)
  */
 export function createATPSynthaseComplex(paletteName = 'ecoli', options = {}) {
   const group = new THREE.Group();
@@ -124,9 +122,40 @@ export function createATPSynthaseComplex(paletteName = 'ecoli', options = {}) {
     function: 'Rotary nano-motor synthesizing ATP from proton electrochemical gradient.'
   };
 
-  // 1. F1 Catalytic Headpiece (Hexamer alpha3-beta3 2D contoured assembly)
+  // Dedicated internal rotor sub-group (F0 rotor ring + central shaft) that spins
+  const rotorSubGroup = new THREE.Group();
+  group.add(rotorSubGroup);
+  group.userData.rotor = rotorSubGroup;
+
+  // 1. F0 Membrane Rotor Ring (c-ring embedded in inner membrane at y = 0)
+  const rotorGroup = new THREE.Group();
+  rotorGroup.position.set(0, 0, 0);
+
+  for (let i = 0; i < 8; i++) {
+    const x = (i - 3.5) * 2.2;
+    const rShape = createLobed2DShape(2.4, 3, 0.1);
+    const color = getPaletteColor(paletteName, 'membrane', i % 4);
+    const mesh = create2DShapeMesh(rShape, color, options);
+    mesh.position.set(x, 0, 0.1);
+    rotorGroup.add(mesh);
+  }
+  rotorSubGroup.add(rotorGroup);
+
+  // 2. Central Stalk (gamma subunit) extending down into F1 head (y = 0 to -14)
+  const stalkShape = new THREE.Shape();
+  stalkShape.moveTo(-1.8, 2);
+  stalkShape.lineTo(1.8, 2);
+  stalkShape.lineTo(1.2, -14);
+  stalkShape.lineTo(-1.2, -14);
+  stalkShape.closePath();
+
+  const stalkMesh = create2DShapeMesh(stalkShape, getPaletteColor(paletteName, 'enzyme', 3), options);
+  stalkMesh.position.set(0, 0, 0);
+  rotorSubGroup.add(stalkMesh);
+
+  // 3. F1 Catalytic Headpiece (Hexamer alpha3-beta3 in cytoplasm below inner membrane at y = -14)
   const headGroup = new THREE.Group();
-  headGroup.position.set(0, 14, 0);
+  headGroup.position.set(0, -14, 0);
 
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * Math.PI * 2;
@@ -138,43 +167,17 @@ export function createATPSynthaseComplex(paletteName = 'ecoli', options = {}) {
   }
   group.add(headGroup);
 
-  // 2. Central Stalk (gamma subunit)
-  const stalkShape = new THREE.Shape();
-  stalkShape.moveTo(-1.8, -4);
-  stalkShape.lineTo(1.8, -4);
-  stalkShape.lineTo(1.2, 12);
-  stalkShape.lineTo(-1.2, 12);
-  stalkShape.closePath();
-
-  const stalkMesh = create2DShapeMesh(stalkShape, getPaletteColor(paletteName, 'enzyme', 3), options);
-  stalkMesh.position.set(0, 0, 0);
-  group.add(stalkMesh);
-
-  // 3. Peripheral Stalk (b2 delta stator arm)
+  // 4. Peripheral Stalk (b2 delta stator arm anchoring F1 head to membrane)
   const armShape = new THREE.Shape();
-  armShape.moveTo(6, -6);
-  armShape.bezierCurveTo(8, 2, 9, 10, 6, 16);
-  armShape.lineTo(4.5, 16);
-  armShape.bezierCurveTo(7, 10, 6, 2, 4.5, -6);
+  armShape.moveTo(6, 2);
+  armShape.bezierCurveTo(8, -4, 9, -10, 6, -16);
+  armShape.lineTo(4.5, -16);
+  armShape.bezierCurveTo(7, -10, 6, -4, 4.5, 2);
   armShape.closePath();
 
   const armMesh = create2DShapeMesh(armShape, getPaletteColor(paletteName, 'enzyme', 4), options);
   armMesh.position.set(2, 0, 0.05);
   group.add(armMesh);
-
-  // 4. F0 Membrane Rotor Ring (c-ring embedded in inner membrane)
-  const rotorGroup = new THREE.Group();
-  rotorGroup.position.set(0, -6, 0);
-
-  for (let i = 0; i < 8; i++) {
-    const x = (i - 3.5) * 2.2;
-    const rShape = createLobed2DShape(2.4, 3, 0.1);
-    const color = getPaletteColor(paletteName, 'membrane', i % 4);
-    const mesh = create2DShapeMesh(rShape, color, options);
-    mesh.position.set(x, 0, 0.1);
-    rotorGroup.add(mesh);
-  }
-  group.add(rotorGroup);
 
   return group;
 }
@@ -218,12 +221,16 @@ export function createDNAStrand(length = 80, paletteName = 'ecoli', options = {}
     mesh2.position.set(x2, y, 0.1);
     group.add(mesh2);
 
-    // Base Pair Rungs
+    // Base Pair Rungs (Enforce non-zero minimum width to prevent degenerate geometry)
     if (Math.abs(Math.floor(y)) % 4 === 0) {
+      const dx = x2 - x1;
+      const width = Math.abs(dx) < 1.2 ? (dx >= 0 ? 1.2 : -1.2) : dx;
+      const rx2 = x1 + width;
+
       const rungShape = new THREE.Shape();
       rungShape.moveTo(x1, y - 0.5);
-      rungShape.lineTo(x2, y - 0.5);
-      rungShape.lineTo(x2, y + 0.5);
+      rungShape.lineTo(rx2, y - 0.5);
+      rungShape.lineTo(rx2, y + 0.5);
       rungShape.lineTo(x1, y + 0.5);
       rungShape.closePath();
 
@@ -458,6 +465,11 @@ export function createFlagellarMotorComplex(paletteName = 'ecoli', options = {})
     function: 'Rotary nano-motor spanning cell wall that spins the flagellar filament for bacterial propulsion.'
   };
 
+  // Dedicated internal rotor sub-group (C-ring + MS-ring + central drive shaft)
+  const rotorSubGroup = new THREE.Group();
+  group.add(rotorSubGroup);
+  group.userData.rotor = rotorSubGroup;
+
   // 1. Cytoplasmic C-Ring Rotor (Large cup base in cytoplasm)
   const cRingShape = new THREE.Shape();
   cRingShape.moveTo(-16, -14);
@@ -468,14 +480,14 @@ export function createFlagellarMotorComplex(paletteName = 'ecoli', options = {})
 
   const cRingColor = getPaletteColor(paletteName, 'structural', 0);
   const cRingMesh = create2DShapeMesh(cRingShape, cRingColor, options);
-  group.add(cRingMesh);
+  rotorSubGroup.add(cRingMesh);
 
-  // 2. MS-Ring & Stator embedded in inner membrane
+  // 2. MS-Ring embedded in inner membrane
   const msShape = createLobed2DShape(9, 6, 0.15);
   const msColor = getPaletteColor(paletteName, 'structural', 1);
   const msMesh = create2DShapeMesh(msShape, msColor, options);
   msMesh.position.set(0, -2, 0.1);
-  group.add(msMesh);
+  rotorSubGroup.add(msMesh);
 
   // 3. Central Drive Shaft / Rod through periplasm
   const rodShape = new THREE.Shape();
@@ -488,9 +500,9 @@ export function createFlagellarMotorComplex(paletteName = 'ecoli', options = {})
   const rodColor = getPaletteColor(paletteName, 'enzyme', 0);
   const rodMesh = create2DShapeMesh(rodShape, rodColor, options);
   rodMesh.position.z = 0.15;
-  group.add(rodMesh);
+  rotorSubGroup.add(rodMesh);
 
-  // 4. P-Ring (Peptidoglycan ring) & L-Ring (Outer membrane ring)
+  // 4. P-Ring (Peptidoglycan ring) & L-Ring (Outer membrane ring) - Fixed Stators
   const pRingShape = createLobed2DShape(6.5, 4, 0.1);
   const pMesh = create2DShapeMesh(pRingShape, getPaletteColor(paletteName, 'structural', 2), options);
   pMesh.position.set(0, 8, 0.2);
@@ -522,3 +534,4 @@ export function createFlagellarMotorComplex(paletteName = 'ecoli', options = {})
 
   return group;
 }
+

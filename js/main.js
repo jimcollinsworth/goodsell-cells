@@ -87,10 +87,11 @@ class GoodsellCellSimulator {
     const renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(renderPass);
 
+    const pixelRatio = this.renderer.getPixelRatio();
     this.outlinePass = new ShaderPass(SobelOutlineShader);
     this.outlinePass.uniforms['resolution'].value.set(
-      window.innerWidth * window.devicePixelRatio,
-      window.innerHeight * window.devicePixelRatio
+      window.innerWidth * pixelRatio,
+      window.innerHeight * pixelRatio
     );
     this.outlinePass.uniforms['outlineThickness'].value = this.outlineThickness;
     this.outlinePass.uniforms['inkColor'].value.set(GOODSELL_PALETTES.ecoli.inkColor);
@@ -295,9 +296,10 @@ class GoodsellCellSimulator {
     this.composer.setSize(width, height);
 
     if (this.outlinePass) {
+      const pixelRatio = this.renderer.getPixelRatio();
       this.outlinePass.uniforms['resolution'].value.set(
-        width * window.devicePixelRatio,
-        height * window.devicePixelRatio
+        width * pixelRatio,
+        height * pixelRatio
       );
     }
   }

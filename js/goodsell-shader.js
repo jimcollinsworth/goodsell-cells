@@ -35,17 +35,19 @@ export function createGoodsellMaterial(colorHex, options = {}) {
     varying vec3 vWorldPosition;
 
     void main() {
-      vec3 normal = normalize(vNormal);
-      vec3 lightDir = normalize(uLightDirection);
-
-      // 2D Watercolor Wash: Radial gradient from UV center (0.5, 0.5)
+      // 2D Directional highlight from top-left (-0.4, 0.4) across shape UVs
+      vec2 lightDir2D = normalize(vec2(-0.4, 0.4));
       vec2 centerOffset = vUv - vec2(0.5);
       float distFromCenter = length(centerOffset);
-      float watercolorWash = 1.0 - smoothstep(0.0, 0.7, distFromCenter) * 0.25;
+      
+      // Top-left highlight & bottom-right shadow wash for 2D volume feel
+      float directionalWash = dot(normalize(centerOffset + vec2(0.3, -0.3)), -lightDir2D);
+      directionalWash = clamp(directionalWash * 0.5 + 0.5, 0.0, 1.0);
+      
+      // Soft radial edge darkening (watercolor wash edge)
+      float radialWash = 1.0 - smoothstep(0.15, 0.65, distFromCenter) * 0.25;
 
-      // Soft directional lighting term for 2D volume feel
-      float NdotL = max(dot(normal, lightDir), 0.0);
-      float rawLight = mix(0.7, 1.0, NdotL) * watercolorWash;
+      float rawLight = mix(0.72, 1.05, directionalWash) * radialWash;
 
       // Quantize diffuse lighting into discrete Goodsell watercolor tone steps
       float quantizedLight = floor(rawLight * uToneSteps + 0.15) / uToneSteps;
@@ -73,7 +75,8 @@ export function createGoodsellMaterial(colorHex, options = {}) {
 }
 
 /**
- * Sobel Edge Detection Shader for Hand-Drawn Ink Outline Pass in 2D Orthographic Mode
+ * Sobel Edge Detection Shader for Hand-Drawn Ink Outline Pass in 2D Orthographic Mode.
+ * Uses 3D RGB color distance across neighboring texels to reliably detect all color boundaries.
  */
 export const SobelOutlineShader = {
   uniforms: {
@@ -81,7 +84,7 @@ export const SobelOutlineShader = {
     tDepth: { value: null },
     resolution: { value: new THREE.Vector2(1024, 1024) },
     outlineThickness: { value: 1.5 },
-    outlineThreshold: { value: 0.10 },
+    outlineThreshold: { value: 0.08 },
     inkColor: { value: new THREE.Color('#1a1815') }
   },
 
@@ -116,33 +119,28 @@ export const SobelOutlineShader = {
        1.0,  2.0,  1.0
     );
 
-    float getLuminance(vec3 color) {
-      return dot(color, vec3(0.299, 0.587, 0.114));
-    }
-
     void main() {
       vec2 texel = vec2(outlineThickness / resolution.x, outlineThickness / resolution.y);
 
-      float edgeX = 0.0;
-      float edgeY = 0.0;
+      vec3 colorX = vec3(0.0);
+      vec3 colorY = vec3(0.0);
 
       for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
           vec2 offset = vec2(float(i - 1), float(j - 1)) * texel;
-          vec4 texelColor = texture2D(tDiffuse, vUv + offset);
-          float val = getLuminance(texelColor.rgb);
+          vec3 texelColor = texture2D(tDiffuse, vUv + offset).rgb;
 
-          edgeX += val * Gx[i][j];
-          edgeY += val * Gy[i][j];
+          colorX += texelColor * Gx[i][j];
+          colorY += texelColor * Gy[i][j];
         }
       }
 
-      float edge = sqrt(edgeX * edgeX + edgeY * edgeY);
+      float edge = length(colorX) + length(colorY);
       vec4 baseColor = texture2D(tDiffuse, vUv);
 
       if (edge > outlineThreshold) {
         // Blend ink line smoothly for delicate hand-drawn stroke feel
-        float inkFactor = smoothstep(outlineThreshold, outlineThreshold * 1.8, edge);
+        float inkFactor = smoothstep(outlineThreshold, outlineThreshold * 2.0, edge);
         gl_FragColor = vec4(mix(baseColor.rgb, inkColor, inkFactor), 1.0);
       } else {
         gl_FragColor = baseColor;
@@ -150,4 +148,5 @@ export const SobelOutlineShader = {
     }
   `
 };
+
 

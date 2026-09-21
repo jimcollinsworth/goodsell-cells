@@ -76,8 +76,23 @@ export class SimulatorUI {
   showTooltip(x, y, data) {
     if (!this.tooltipEl || !data) return;
     this.tooltipEl.style.display = 'block';
-    this.tooltipEl.style.left = `${x + 15}px`;
-    this.tooltipEl.style.top = `${y + 15}px`;
+
+    const padding = 15;
+    const tooltipWidth = 260;
+    const tooltipHeight = 110;
+
+    let left = x + padding;
+    let top = y + padding;
+
+    if (left + tooltipWidth > window.innerWidth) {
+      left = Math.max(10, x - tooltipWidth - 10);
+    }
+    if (top + tooltipHeight > window.innerHeight) {
+      top = Math.max(10, y - tooltipHeight - 10);
+    }
+
+    this.tooltipEl.style.left = `${left}px`;
+    this.tooltipEl.style.top = `${top}px`;
 
     this.tooltipEl.innerHTML = `
       <div class="tooltip-title">${data.name || 'Macromolecule'}</div>

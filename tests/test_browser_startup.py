@@ -180,12 +180,27 @@ def test_interactive_operations(server):
         page.wait_for_function("() => window.app.currentScenePreset === 'crowded-ecoli'")
         page.wait_for_timeout(300)
 
-        viewport = page.viewport_size
-        center_x = viewport["width"] / 2
-        center_y = viewport["height"] / 2
+        # Compute screen coordinates of target named molecule dynamically
+        target_pos = page.evaluate("""
+            () => {
+                let targetGroup = null;
+                window.app.scene.traverse((child) => {
+                    if (!targetGroup && child.userData && child.userData.name === '70S Ribosome') {
+                        targetGroup = child;
+                    }
+                });
+                if (!targetGroup) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
-        # Move mouse over ribo1 (located at x=-25 in world coordinates)
-        page.mouse.move(center_x - 160, center_y)
+                // Convert object position through camera projection to screen coordinates
+                const pos = targetGroup.position.clone();
+                pos.project(window.app.camera);
+                const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+                return { x, y };
+            }
+        """)
+
+        page.mouse.move(target_pos["x"], target_pos["y"])
         page.wait_for_timeout(300)
 
         tooltip_info = page.evaluate("""

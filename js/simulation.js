@@ -30,8 +30,10 @@ export class CellSimulation {
 
     this.molecules.push(entry);
 
-    // Track rotary machines like ATP Synthase and Flagellar Motor
-    if (object.userData.name && (object.userData.name.includes('ATP Synthase') || object.userData.name.includes('Flagellar Motor'))) {
+    // Track designated internal rotor sub-groups if present, or target object
+    if (object.userData && object.userData.rotor) {
+      this.rotors.push(object.userData.rotor);
+    } else if (object.userData.name && (object.userData.name.includes('ATP Synthase') || object.userData.name.includes('Flagellar Motor'))) {
       this.rotors.push(object);
     }
   }
