@@ -2,13 +2,15 @@
 
 An interactive, multi-scale cell simulator rendering molecular structures and intracellular crowding in the iconic visual design language of **David S. Goodsell** (macromolecular space-filling models, flat posterized cel-shading, and hand-drawn ink outline strokes).
 
+🌐 **Live Demo**: [https://jimcollinsworth.github.io/goodsell-cells/](https://jimcollinsworth.github.io/goodsell-cells/)
+
 ![Goodsell Style Rendering](https://ccsb.scripps.edu/goodsell/wp-content/uploads/sites/9/2016/04/Ecoli_crosssection_1,000,000x.jpg)
 
 ---
 
 ## Key Visual & Architectural Features
 
-1. **Posterized Cel-Shading**: Multi-tone flat diffuse shading (2–3 tone steps) conveying 3D molecular volume without glossy specular reflections.
+1. **Posterized Cel-Shading**: Multi-tone flat diffuse shading (2–5 tone steps) conveying 3D molecular volume without glossy specular reflections.
 2. **Sobel Ink-Line Contours**: Custom WebGL post-processing edge detector rendering bold black/dark ink outlines around atomic clusters and subunit boundaries.
 3. **Macromolecular Crowding**: Realistic biological density (~350 mg/mL) depicting cytoplasmic matrix, membrane bilayer, and molecular complexes packed in close proximity.
 4. **Authentic Functional Palettes**:
@@ -25,7 +27,7 @@ An interactive, multi-scale cell simulator rendering molecular structures and in
 
 ---
 
-## How to Run
+## How to Run Locally
 
 Since `goodsell-cells` uses native ES Modules, it can be served with any simple static HTTP server:
 
