@@ -115,3 +115,56 @@ def test_simulation_dynamics_logic(server):
     assert sim_results["unpausedState"] is False
     assert sim_results["updatedSpeed"] == 2.5
     assert sim_results["clearedCount"] == 0
+
+
+def test_simulation_collision_physics(server):
+    """Verify physics collision resolution between stationary and mobile molecules."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{server}/index.html")
+        page.wait_for_function("() => window.app && window.app.simulation")
+
+        collision_res = page.evaluate("""
+            async () => {
+                const THREE = await import('three');
+                const { CellSimulation } = await import('./js/simulation.js');
+
+                const scene = new THREE.Scene();
+                const sim = new CellSimulation(scene);
+
+                // Stationary wall m1 at (0, 0, 0), radius 10
+                const m1Mesh = new THREE.Object3D();
+                m1Mesh.position.set(0, 0, 0);
+                m1Mesh.userData.radius = 10;
+                sim.addMolecule(m1Mesh, true);
+
+                // Mobile object m2 overlapping at (12, 0, 0), radius 10 (minDist = 20, dist = 12, overlap = 8)
+                const m2Mesh = new THREE.Object3D();
+                m2Mesh.position.set(12, 0, 0);
+                m2Mesh.userData.radius = 10;
+                sim.addMolecule(m2Mesh, false);
+
+                // Set mobile m2 velocity moving left towards m1
+                sim.molecules[1].velocity.set(-2, 0, 0);
+
+                // Run one step without Brownian random kicks affecting test accuracy
+                sim.brownianIntensity = 0;
+                sim.update(0.016);
+
+                return {
+                    m1PosX: m1Mesh.position.x,
+                    m2PosX: m2Mesh.position.x,
+                    m2VelX: sim.molecules[1].velocity.x
+                };
+            }
+        """)
+        browser.close()
+
+    # Stationary object must not move from origin
+    assert collision_res["m1PosX"] == pytest.approx(0.0)
+    # Mobile object must be pushed out to full minDist (>= 20)
+    assert collision_res["m2PosX"] >= 20.0
+    # Mobile velocity should bounce back rightwards (> 0)
+    assert collision_res["m2VelX"] > 0.0
+

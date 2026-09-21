@@ -111,15 +111,32 @@ export class CellSimulation {
           const overlap = minDist - dist;
           const normal = distVec.normalize();
 
-          if (!m1.isStationary) m1.mesh.position.addScaledVector(normal, overlap * 0.5);
-          if (!m2.isStationary) m2.mesh.position.addScaledVector(normal, -overlap * 0.5);
+          if (!m1.isStationary && !m2.isStationary) {
+            m1.mesh.position.addScaledVector(normal, overlap * 0.5);
+            m2.mesh.position.addScaledVector(normal, -overlap * 0.5);
+          } else if (!m1.isStationary && m2.isStationary) {
+            m1.mesh.position.addScaledVector(normal, overlap);
+          } else if (m1.isStationary && !m2.isStationary) {
+            m2.mesh.position.addScaledVector(normal, -overlap);
+          }
 
-          // Elastic bounce impulse
+          // Elastic bounce impulse if moving toward each other
           const relVel = m1.velocity.clone().sub(m2.velocity);
-          const impulse = normal.multiplyScalar(relVel.dot(normal) * 0.5);
+          const velAlongNormal = relVel.dot(normal);
 
-          if (!m1.isStationary) m1.velocity.sub(impulse);
-          if (!m2.isStationary) m2.velocity.add(impulse);
+          if (velAlongNormal < 0) {
+            if (!m1.isStationary && !m2.isStationary) {
+              const impulse = normal.clone().multiplyScalar(velAlongNormal * 0.5);
+              m1.velocity.sub(impulse);
+              m2.velocity.add(impulse);
+            } else if (!m1.isStationary && m2.isStationary) {
+              const impulse = normal.clone().multiplyScalar(m1.velocity.dot(normal) * 1.8);
+              m1.velocity.sub(impulse);
+            } else if (m1.isStationary && !m2.isStationary) {
+              const impulse = normal.clone().multiplyScalar(m2.velocity.dot(normal) * 1.8);
+              m2.velocity.sub(impulse);
+            }
+          }
         }
       }
     }

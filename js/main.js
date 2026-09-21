@@ -249,15 +249,17 @@ class GoodsellCellSimulator {
   }
 
   onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const width = window.innerWidth || 1;
+    const height = window.innerHeight || 1;
+    this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(width, height);
+    this.composer.setSize(width, height);
 
     if (this.outlinePass) {
       this.outlinePass.uniforms['resolution'].value.set(
-        window.innerWidth * window.devicePixelRatio,
-        window.innerHeight * window.devicePixelRatio
+        width * window.devicePixelRatio,
+        height * window.devicePixelRatio
       );
     }
   }

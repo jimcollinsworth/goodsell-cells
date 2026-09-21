@@ -6,8 +6,8 @@ import * as THREE from 'three';
  * and applies rich flat color fills.
  */
 export function createGoodsellMaterial(colorHex, options = {}) {
-  const numSteps = options.toneSteps || 3.0;
-  const rimIntensity = options.rimIntensity || 0.25;
+  const numSteps = Math.max(1.0, options.toneSteps || 3.0);
+  const rimIntensity = options.rimIntensity ?? 0.25;
 
   const vertexShader = `
     varying vec3 vNormal;

@@ -157,19 +157,19 @@ def test_interactive_operations(server):
         assert cam_pos_after["z"] == pytest.approx(140)
 
         # 5. Raycasting Hover Tooltip
-        # Load crowded-ecoli preset to have centered molecules
+        # Load crowded-ecoli preset to have molecules in known locations
         page.select_option("#scene-select", "crowded-ecoli")
         page.wait_for_function("() => window.app.currentScenePreset === 'crowded-ecoli'")
+        page.wait_for_timeout(300)
 
-        # Trigger pointermove at center of canvas where molecules are located
         viewport = page.viewport_size
         center_x = viewport["width"] / 2
         center_y = viewport["height"] / 2
 
-        page.mouse.move(center_x, center_y)
+        # Move mouse over ribo1 (located at x=-25 in world coordinates, ~160px left of center)
+        page.mouse.move(center_x - 160, center_y)
         page.wait_for_timeout(300)
 
-        # Check tooltip element display and contents
         tooltip_info = page.evaluate("""
             () => {
                 const el = document.getElementById('inspector-tooltip');
@@ -180,31 +180,20 @@ def test_interactive_operations(server):
             }
         """)
 
-        # If hover raycast hit top group, tooltip is displayed; or we can directly test showTooltip function
-        if tooltip_info["display"] != "block":
-            # Direct test of showTooltip method
-            page.evaluate("""
-                () => {
-                    window.app.ui.showTooltip(100, 100, {
-                        name: 'Test Macromolecule',
-                        pdbId: '1TEST',
-                        weight: '100 kDa',
-                        function: 'Test function'
-                    });
-                }
-            """)
-            tooltip_info = page.evaluate("""
-                () => {
-                    const el = document.getElementById('inspector-tooltip');
-                    return {
-                        display: el ? el.style.display : 'none',
-                        html: el ? el.innerHTML : ''
-                    };
-                }
-            """)
+        assert tooltip_info["display"] == "block", f"Expected tooltip display 'block', got '{tooltip_info['display']}'"
+        assert len(tooltip_info["html"]) > 0, "Tooltip HTML should not be empty on hover"
 
-        assert tooltip_info["display"] == "block"
-        assert "Test Macromolecule" in tooltip_info["html"] or "70S Ribosome" in tooltip_info["html"] or "ATP Synthase" in tooltip_info["html"] or "B-DNA" in tooltip_info["html"] or "Phospholipid" in tooltip_info["html"]
+        # Move mouse to top-left corner (empty space) to test hiding
+        page.mouse.move(10, 10)
+        page.wait_for_timeout(300)
+
+        hidden_info = page.evaluate("""
+            () => {
+                const el = document.getElementById('inspector-tooltip');
+                return el ? el.style.display : 'none';
+            }
+        """)
+        assert hidden_info == "none", f"Expected tooltip display 'none' when off molecule, got '{hidden_info}'"
 
         browser.close()
 
