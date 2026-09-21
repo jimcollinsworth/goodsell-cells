@@ -12,8 +12,8 @@ def launch_browser(p, headless=True):
             continue
     raise RuntimeError("Could not launch browser")
 
-def test_pdb_complexes_and_sphere_counts(server):
-    """Verify sphere counts, userData, and geometry construction of PDB models."""
+def test_pdb_complexes_and_structure(server):
+    """Verify 2D contoured shape generation, userData metadata, and geometry construction of PDB models."""
     with sync_playwright() as p:
         browser = launch_browser(p)
         page = browser.new_page()
@@ -23,65 +23,87 @@ def test_pdb_complexes_and_sphere_counts(server):
         complex_data = page.evaluate("""
             async () => {
                 const pdb = await import('./js/pdb-loader.js');
-                
+
                 const ribo = pdb.createRibosomeComplex('ecoli');
                 const atp = pdb.createATPSynthaseComplex('ecoli');
                 const dna = pdb.createDNAStrand(80, 'ecoli');
                 const trna = pdb.createtRNA('ecoli');
                 const enzyme = pdb.createEnzymeBlob(10, 'ecoli');
                 const membrane = pdb.createMembraneBilayer(40, 20, 'ecoli');
+                const outerMembrane = pdb.createOuterMembrane(40, 'ecoli');
+                const flagellar = pdb.createFlagellarMotorComplex('ecoli');
 
                 return {
-                    riboSphereCount: ribo.children.length,
+                    riboPartCount: ribo.children.length,
                     riboUserData: ribo.userData,
 
-                    atpSphereCount: atp.children.length,
+                    atpPartCount: atp.children.length,
                     atpUserData: atp.userData,
 
-                    dnaSphereCount: dna.children.length,
+                    dnaPartCount: dna.children.length,
                     dnaUserData: dna.userData,
 
-                    trnaSphereCount: trna.children.length,
+                    trnaPartCount: trna.children.length,
                     trnaUserData: trna.userData,
 
-                    enzymeSphereCount: enzyme.children.length,
+                    enzymePartCount: enzyme.children.length,
                     enzymeUserData: enzyme.userData,
 
-                    membraneSphereCount: membrane.children.length,
-                    membraneUserData: membrane.userData
+                    membranePartCount: membrane.children.length,
+                    membraneUserData: membrane.userData,
+
+                    outerMembranePartCount: outerMembrane.children.length,
+                    outerMembraneUserData: outerMembrane.userData,
+
+                    flagellarPartCount: flagellar.children.length,
+                    flagellarUserData: flagellar.userData
                 };
             }
         """)
         browser.close()
 
     # 1. 70S Ribosome
-    assert complex_data["riboSphereCount"] == 180
+    assert complex_data["riboPartCount"] > 0
     assert complex_data["riboUserData"]["pdbId"] == "4V4A"
     assert complex_data["riboUserData"]["name"] == "70S Ribosome"
 
     # 2. ATP Synthase Complex
-    assert complex_data["atpSphereCount"] > 100
+    assert complex_data["atpPartCount"] > 0
     assert complex_data["atpUserData"]["pdbId"] == "6N2Y"
+    assert complex_data["atpUserData"]["name"] == "ATP Synthase Machine"
 
     # 3. DNA Double Helix
-    assert complex_data["dnaSphereCount"] > 50
+    assert complex_data["dnaPartCount"] > 0
     assert complex_data["dnaUserData"]["pdbId"] == "1BNA"
+    assert complex_data["dnaUserData"]["name"] == "B-DNA Double Helix"
 
     # 4. tRNA
-    assert complex_data["trnaSphereCount"] > 10
+    assert complex_data["trnaPartCount"] > 0
     assert complex_data["trnaUserData"]["pdbId"] == "1EHZ"
+    assert complex_data["trnaUserData"]["name"] == "Transfer RNA (tRNA)"
 
-    # 5. Enzyme Blob (size=10 => count=40)
-    assert complex_data["enzymeSphereCount"] == 40
+    # 5. Enzyme Blob
+    assert complex_data["enzymePartCount"] > 0
     assert complex_data["enzymeUserData"]["pdbId"] == "1PFK"
+    assert complex_data["enzymeUserData"]["name"] == "Metabolic Enzyme Complex"
 
     # 6. Membrane Bilayer
-    assert complex_data["membraneSphereCount"] > 0
+    assert complex_data["membranePartCount"] > 0
     assert complex_data["membraneUserData"]["category"] == "membrane"
+    assert complex_data["membraneUserData"]["name"] == "Inner Membrane"
+
+    # 7. Outer Membrane
+    assert complex_data["outerMembranePartCount"] > 0
+    assert complex_data["outerMembraneUserData"]["name"] == "Outer Membrane"
+
+    # 8. Flagellar Motor Complex
+    assert complex_data["flagellarPartCount"] > 0
+    assert complex_data["flagellarUserData"]["pdbId"] == "6YKM"
+    assert complex_data["flagellarUserData"]["name"] == "Flagellar Motor Complex"
 
 
 def test_simulation_dynamics_logic(server):
-    """Verify simulation state management, speed controls, pause toggling, and motion updates."""
+    """Verify 2D simulation state management, speed controls, pause toggling, and motion updates."""
     with sync_playwright() as p:
         browser = launch_browser(p)
         page = browser.new_page()
@@ -129,7 +151,7 @@ def test_simulation_dynamics_logic(server):
 
 
 def test_simulation_collision_physics(server):
-    """Verify physics collision resolution between stationary and mobile molecules."""
+    """Verify 2D physics collision resolution between stationary and mobile 2D molecules."""
     with sync_playwright() as p:
         browser = launch_browser(p)
         page = browser.new_page()
@@ -178,4 +200,3 @@ def test_simulation_collision_physics(server):
     assert collision_res["m2PosX"] >= 20.0
     # Mobile velocity should bounce back rightwards (> 0)
     assert collision_res["m2VelX"] > 0.0
-

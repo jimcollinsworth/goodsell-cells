@@ -4,7 +4,7 @@ export class CellSimulation {
   constructor(scene, options = {}) {
     this.scene = scene;
     this.molecules = [];
-    this.bounds = options.bounds || new THREE.Vector3(120, 60, 80);
+    this.bounds = options.bounds || new THREE.Vector3(120, 60, 0);
     this.speed = options.speed || 1.0;
     this.brownianIntensity = options.brownianIntensity || 0.15;
     this.isPaused = false;
@@ -17,7 +17,7 @@ export class CellSimulation {
       : new THREE.Vector3(
           (Math.random() - 0.5) * 0.4,
           (Math.random() - 0.5) * 0.4,
-          (Math.random() - 0.5) * 0.4
+          0
         );
 
     const entry = {
@@ -25,13 +25,13 @@ export class CellSimulation {
       velocity: vel,
       initialPos: object.position.clone(),
       isStationary: isStationary,
-      radius: object.userData.radius || 8
+      radius: object.userData.radius || 12
     };
 
     this.molecules.push(entry);
 
-    // Track rotary machines like ATP Synthase
-    if (object.userData.name && object.userData.name.includes('ATP Synthase')) {
+    // Track rotary machines like ATP Synthase and Flagellar Motor
+    if (object.userData.name && (object.userData.name.includes('ATP Synthase') || object.userData.name.includes('Flagellar Motor'))) {
       this.rotors.push(object);
     }
   }
@@ -58,28 +58,29 @@ export class CellSimulation {
 
     const dt = delta * this.speed;
 
-    // 1. Semantic machine activity (e.g. ATP Synthase rotation)
+    // 1. Semantic machine activity (e.g. 2D rotation for ATP Synthase and Flagellar Motor)
     this.rotors.forEach(rotor => {
-      rotor.rotation.y += dt * 1.5;
+      rotor.rotation.z += dt * 0.8;
     });
 
-    // 2. Brownian thermal motion & boundary collisions
+    // 2. 2D Brownian thermal motion & boundary collisions
     for (let i = 0; i < this.molecules.length; i++) {
       const mol = this.molecules[i];
       if (mol.isStationary) continue;
 
-      // Brownian thermal kick
+      // Brownian thermal kick (2D plane: X and Y)
       mol.velocity.x += (Math.random() - 0.5) * this.brownianIntensity * dt;
       mol.velocity.y += (Math.random() - 0.5) * this.brownianIntensity * dt;
-      mol.velocity.z += (Math.random() - 0.5) * this.brownianIntensity * dt;
+      mol.velocity.z = 0; // Lock Z to keep 2D orthographic alignment
 
       // Damping / viscosity drag
       mol.velocity.multiplyScalar(0.98);
 
       // Position update
-      mol.mesh.position.addScaledVector(mol.velocity, dt * 20);
+      mol.mesh.position.x += mol.velocity.x * dt * 20;
+      mol.mesh.position.y += mol.velocity.y * dt * 20;
 
-      // Boundary reflections (Cell membrane container box)
+      // 2D Boundary reflections (Cell membrane container box)
       const pos = mol.mesh.position;
       const halfB = this.bounds;
 
@@ -91,19 +92,16 @@ export class CellSimulation {
         pos.y = Math.sign(pos.y) * halfB.y;
         mol.velocity.y *= -0.8;
       }
-      if (Math.abs(pos.z) > halfB.z) {
-        pos.z = Math.sign(pos.z) * halfB.z;
-        mol.velocity.z *= -0.8;
-      }
     }
 
-    // 3. Molecular Crowding Sphere Collisions
+    // 3. 2D Molecular Crowding Sphere/Circle Collisions
     for (let i = 0; i < this.molecules.length; i++) {
       for (let j = i + 1; j < this.molecules.length; j++) {
         const m1 = this.molecules[i];
         const m2 = this.molecules[j];
 
         const distVec = m1.mesh.position.clone().sub(m2.mesh.position);
+        distVec.z = 0; // 2D planar distance calculation
         const dist = distVec.length();
         const minDist = m1.radius + m2.radius;
 

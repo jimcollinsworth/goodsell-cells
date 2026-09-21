@@ -14,7 +14,7 @@ def launch_browser(p, headless=True):
     raise RuntimeError("Could not launch browser")
 
 def test_startup_and_zero_console_errors(server):
-    """Test browser startup and verify zero console errors or uncaught page exceptions."""
+    """Test 2D browser startup and verify zero console errors or uncaught page exceptions."""
     console_errors = []
     page_errors = []
 
@@ -34,12 +34,12 @@ def test_startup_and_zero_console_errors(server):
 
         browser.close()
 
-    assert len(console_errors) == 0, f"Encountered console errors on startup: {console_errors}"
-    assert len(page_errors) == 0, f"Encountered page exceptions on startup: {page_errors}"
+    assert len(console_errors) == 0, f"Encountered console errors on 2D startup: {console_errors}"
+    assert len(page_errors) == 0, f"Encountered page exceptions on 2D startup: {page_errors}"
 
 
 def test_sample_cell_loading_and_rendering(server):
-    """Test canvas rendering, WebGL context, and presence of molecular meshes in default scene."""
+    """Test 2D orthographic canvas rendering, WebGL context, and presence of molecular meshes in default scene."""
     with sync_playwright() as p:
         browser = launch_browser(p)
         page = browser.new_page()
@@ -54,6 +54,7 @@ def test_sample_cell_loading_and_rendering(server):
                 const gl = app.renderer.getContext();
                 const sceneChildrenCount = app.scene.children.length;
                 const moleculeCount = app.simulation.molecules.length;
+                const isOrthographic = app.camera.isOrthographicCamera;
 
                 // Find named molecular groups in the scene
                 const namedGroups = [];
@@ -67,6 +68,7 @@ def test_sample_cell_loading_and_rendering(server):
                     canvasWidth: canvas.width,
                     canvasHeight: canvas.height,
                     hasWebGLContext: !!gl,
+                    isOrthographic: !!isOrthographic,
                     sceneChildrenCount,
                     moleculeCount,
                     namedGroups
@@ -76,6 +78,7 @@ def test_sample_cell_loading_and_rendering(server):
         browser.close()
 
     assert render_info["hasWebGLContext"] is True
+    assert render_info["isOrthographic"] is True, "Camera must be OrthographicCamera for 2D Goodsell slice"
     assert render_info["canvasWidth"] > 0
     assert render_info["canvasHeight"] > 0
     assert render_info["sceneChildrenCount"] > 0
@@ -83,10 +86,13 @@ def test_sample_cell_loading_and_rendering(server):
     assert "70S Ribosome" in render_info["namedGroups"]
     assert "ATP Synthase Machine" in render_info["namedGroups"]
     assert "B-DNA Double Helix" in render_info["namedGroups"]
+    assert "Outer Membrane" in render_info["namedGroups"]
+    assert "Inner Membrane" in render_info["namedGroups"]
+    assert "Flagellar Motor Complex" in render_info["namedGroups"]
 
 
 def test_interactive_operations(server):
-    """Test changing presets, changing palettes, adjusting sliders, play/pause, reset camera, and raycast tooltip."""
+    """Test changing 2D presets, changing palettes, adjusting sliders, play/pause, resetting 2D camera, and raycast tooltip."""
     console_errors = []
     page_errors = []
 
@@ -156,19 +162,20 @@ def test_interactive_operations(server):
         page.wait_for_function("() => window.app.simulation.isPaused === false")
         assert "Pause" in pause_btn.text_content()
 
-        # Reset Camera Button
-        page.evaluate("() => window.app.camera.position.set(200, 200, 200)")
-        cam_pos_before = page.evaluate("() => ({ x: window.app.camera.position.x, y: window.app.camera.position.y, z: window.app.camera.position.z })")
-        assert cam_pos_before["z"] == pytest.approx(200)
+        # 5. Reset Camera Button (2D Orthographic)
+        page.evaluate("() => { window.app.camera.position.set(200, 200, 200); window.app.camera.zoom = 2.5; window.app.camera.updateProjectionMatrix(); }")
+        cam_state_before = page.evaluate("() => ({ x: window.app.camera.position.x, y: window.app.camera.position.y, z: window.app.camera.position.z, zoom: window.app.camera.zoom })")
+        assert cam_state_before["z"] == pytest.approx(200)
+        assert cam_state_before["zoom"] == pytest.approx(2.5)
 
         reset_cam_btn = page.query_selector("#btn-reset-cam")
         reset_cam_btn.click()
-        page.wait_for_function("() => Math.abs(window.app.camera.position.z - 140) < 0.01")
-        cam_pos_after = page.evaluate("() => ({ x: window.app.camera.position.x, y: window.app.camera.position.y, z: window.app.camera.position.z })")
-        assert cam_pos_after["z"] == pytest.approx(140)
+        page.wait_for_function("() => Math.abs(window.app.camera.position.z - 140) < 0.01 && Math.abs(window.app.camera.zoom - 1.0) < 0.01")
+        cam_state_after = page.evaluate("() => ({ x: window.app.camera.position.x, y: window.app.camera.position.y, z: window.app.camera.position.z, zoom: window.app.camera.zoom })")
+        assert cam_state_after["z"] == pytest.approx(140)
+        assert cam_state_after["zoom"] == pytest.approx(1.0)
 
-        # 5. Raycasting Hover Tooltip
-        # Load crowded-ecoli preset to have molecules in known locations
+        # 6. Raycasting Hover Tooltip
         page.select_option("#scene-select", "crowded-ecoli")
         page.wait_for_function("() => window.app.currentScenePreset === 'crowded-ecoli'")
         page.wait_for_timeout(300)
@@ -177,7 +184,7 @@ def test_interactive_operations(server):
         center_x = viewport["width"] / 2
         center_y = viewport["height"] / 2
 
-        # Move mouse over ribo1 (located at x=-25 in world coordinates, ~160px left of center)
+        # Move mouse over ribo1 (located at x=-25 in world coordinates)
         page.mouse.move(center_x - 160, center_y)
         page.wait_for_timeout(300)
 

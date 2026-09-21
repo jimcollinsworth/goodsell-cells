@@ -12,7 +12,10 @@ import {
   createDNAStrand,
   createtRNA,
   createEnzymeBlob,
-  createMembraneBilayer
+  createMembraneBilayer,
+  createOuterMembrane,
+  createPeptidoglycanNetwork,
+  createFlagellarMotorComplex
 } from './pdb-loader.js';
 import { CellSimulation } from './simulation.js';
 import { SimulatorUI } from './ui.js';
@@ -41,10 +44,15 @@ class GoodsellCellSimulator {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(GOODSELL_PALETTES.ecoli.bg);
 
-    this.camera = new THREE.PerspectiveCamera(
-      45,
-      window.innerWidth / window.innerHeight,
-      1,
+    // Pure 2D Orthographic Camera (no 3D perspective distortion)
+    const aspect = window.innerWidth / window.innerHeight;
+    const frustumSize = 160;
+    this.camera = new THREE.OrthographicCamera(
+      (frustumSize * aspect) / -2,
+      (frustumSize * aspect) / 2,
+      frustumSize / 2,
+      frustumSize / -2,
+      0.1,
       1000
     );
     this.camera.position.set(0, 0, 140);
@@ -54,18 +62,23 @@ class GoodsellCellSimulator {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.container.appendChild(this.renderer.domElement);
 
+    // 2D Controls (Panning & Orthographic Zoom, No Rotation)
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableRotate = false; // Pure 2D orthographic slice navigation
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-    this.controls.maxDistance = 350;
-    this.controls.minDistance = 20;
+    this.controls.dampingFactor = 0.08;
+    this.controls.enableZoom = true;
+    this.controls.enablePan = true;
+    this.controls.screenSpacePanning = true;
+    this.controls.minZoom = 0.4;
+    this.controls.maxZoom = 4.0;
 
-    // Ambient & Directional Lighting for Cel-Shading
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Ambient Lighting for Flat 2D Cel-Shading
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(50, 100, 80);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    dirLight.position.set(20, 40, 100);
     this.scene.add(dirLight);
   }
 
@@ -134,6 +147,8 @@ class GoodsellCellSimulator {
 
   resetCamera() {
     this.camera.position.set(0, 0, 140);
+    this.camera.zoom = 1.0;
+    this.camera.updateProjectionMatrix();
     this.controls.target.set(0, 0, 0);
     this.controls.update();
   }
@@ -148,56 +163,72 @@ class GoodsellCellSimulator {
     };
 
     if (presetName === 'crowded-ecoli') {
-      // 1. Top & Bottom Membrane Bilayer Boundaries
-      const topMembrane = createMembraneBilayer(140, 70, this.currentPalette, options);
-      topMembrane.position.y = 35;
-      this.scene.add(topMembrane);
-      this.simulation.addMolecule(topMembrane, true);
+      // Authentic Cell Envelope Architecture (Cross-Sectional Anatomical Slice)
 
-      const botMembrane = createMembraneBilayer(140, 70, this.currentPalette, options);
-      botMembrane.position.y = -35;
-      this.scene.add(botMembrane);
-      this.simulation.addMolecule(botMembrane, true);
+      // 1. Outer Membrane Layer (top boundary)
+      const outerMembrane = createOuterMembrane(220, this.currentPalette, options);
+      outerMembrane.position.y = 65;
+      this.scene.add(outerMembrane);
+      this.simulation.addMolecule(outerMembrane, true);
 
-      // 2. Central 70S Ribosomes
+      // 2. Periplasmic Peptidoglycan Network Space
+      const peptidoglycan = createPeptidoglycanNetwork(220, this.currentPalette, options);
+      peptidoglycan.position.y = 52;
+      this.scene.add(peptidoglycan);
+      this.simulation.addMolecule(peptidoglycan, true);
+
+      // 3. Inner Plasma Membrane Bilayer
+      const innerMembrane = createMembraneBilayer(220, 60, this.currentPalette, options);
+      innerMembrane.position.y = 40;
+      this.scene.add(innerMembrane);
+      this.simulation.addMolecule(innerMembrane, true);
+
+      // 4. Authentic Flagellar Motor Complex (spanning inner membrane, periplasm, outer membrane & filament)
+      const flagellarMotor = createFlagellarMotorComplex(this.currentPalette, options);
+      flagellarMotor.position.set(-45, 40, 0);
+      flagellarMotor.userData.radius = 18;
+      this.scene.add(flagellarMotor);
+      this.simulation.addMolecule(flagellarMotor, true);
+
+      // 5. ATP Synthase Embedded in Inner Membrane
+      const atp = createATPSynthaseComplex(this.currentPalette, options);
+      atp.position.set(45, 40, 0);
+      atp.userData.radius = 14;
+      this.scene.add(atp);
+      this.simulation.addMolecule(atp, true);
+
+      // 6. Central 2D 70S Ribosomes in Cytoplasm
       const ribo1 = createRibosomeComplex(this.currentPalette, options);
-      ribo1.position.set(-25, 0, 10);
+      ribo1.position.set(-25, 5, 0);
       ribo1.userData.radius = 16;
       this.scene.add(ribo1);
       this.simulation.addMolecule(ribo1);
 
       const ribo2 = createRibosomeComplex(this.currentPalette, options);
-      ribo2.position.set(25, 5, -15);
+      ribo2.position.set(25, -10, 0);
       ribo2.userData.radius = 16;
       this.scene.add(ribo2);
       this.simulation.addMolecule(ribo2);
 
-      // 3. DNA Double Helix Strand
+      // 7. DNA Double Helix Fibers
       const dna = createDNAStrand(100, this.currentPalette, options);
-      dna.position.set(0, -10, 0);
-      dna.rotation.z = Math.PI / 6;
+      dna.position.set(0, -25, 0);
+      dna.rotation.z = Math.PI / 12;
       dna.userData.radius = 12;
       this.scene.add(dna);
       this.simulation.addMolecule(dna, true);
 
-      // 4. ATP Synthase Embedded in Membrane
-      const atp = createATPSynthaseComplex(this.currentPalette, options);
-      atp.position.set(-45, 20, 5);
-      atp.userData.radius = 14;
-      this.scene.add(atp);
-      this.simulation.addMolecule(atp, true);
-
-      // 5. Crowded Cytoplasmic Enzymes & tRNAs
+      // 8. Crowded Cytoplasmic Enzymes & tRNAs
       for (let i = 0; i < 16; i++) {
         const categories = ['enzyme', 'structural', 'plasma'];
         const cat = categories[i % categories.length];
         const enzyme = createEnzymeBlob(8 + Math.random() * 4, this.currentPalette, cat, options);
         enzyme.position.set(
-          (Math.random() - 0.5) * 80,
-          (Math.random() - 0.5) * 40,
-          (Math.random() - 0.5) * 40
+          (Math.random() - 0.5) * 100,
+          -10 + (Math.random() - 0.5) * 45,
+          0
         );
-        enzyme.userData.radius = 6;
+        enzyme.userData.radius = 7;
         this.scene.add(enzyme);
         this.simulation.addMolecule(enzyme);
       }
@@ -205,9 +236,9 @@ class GoodsellCellSimulator {
       for (let i = 0; i < 6; i++) {
         const trna = createtRNA(this.currentPalette, options);
         trna.position.set(
-          (Math.random() - 0.5) * 70,
-          (Math.random() - 0.5) * 30,
-          (Math.random() - 0.5) * 30
+          (Math.random() - 0.5) * 90,
+          -5 + (Math.random() - 0.5) * 35,
+          0
         );
         trna.userData.radius = 5;
         this.scene.add(trna);
@@ -221,13 +252,13 @@ class GoodsellCellSimulator {
       this.scene.add(ribo);
       this.simulation.addMolecule(ribo, true);
 
-      // Surround with floating tRNAs
+      // Surround with floating tRNAs in 2D plane
       for (let i = 0; i < 8; i++) {
         const trna = createtRNA(this.currentPalette, options);
         trna.position.set(
-          (Math.random() - 0.5) * 50,
-          (Math.random() - 0.5) * 50,
-          (Math.random() - 0.5) * 50
+          (Math.random() - 0.5) * 60,
+          (Math.random() - 0.5) * 60,
+          0
         );
         trna.userData.radius = 5;
         this.scene.add(trna);
@@ -241,8 +272,8 @@ class GoodsellCellSimulator {
       this.scene.add(atp);
       this.simulation.addMolecule(atp, true);
 
-      const membrane = createMembraneBilayer(120, 60, this.currentPalette, options);
-      membrane.position.y = -14;
+      const membrane = createMembraneBilayer(160, 60, this.currentPalette, options);
+      membrane.position.y = -16;
       this.scene.add(membrane);
       this.simulation.addMolecule(membrane, true);
     }
@@ -251,8 +282,15 @@ class GoodsellCellSimulator {
   onWindowResize() {
     const width = window.innerWidth || 1;
     const height = window.innerHeight || 1;
-    this.camera.aspect = width / height;
+    const aspect = width / height;
+    const frustumSize = 160;
+
+    this.camera.left = (frustumSize * aspect) / -2;
+    this.camera.right = (frustumSize * aspect) / 2;
+    this.camera.top = frustumSize / 2;
+    this.camera.bottom = frustumSize / -2;
     this.camera.updateProjectionMatrix();
+
     this.renderer.setSize(width, height);
     this.composer.setSize(width, height);
 
