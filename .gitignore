@@ -6,3 +6,8 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Python / Pytest
+__pycache__/
+*.py[cod]
+.pytest_cache/
