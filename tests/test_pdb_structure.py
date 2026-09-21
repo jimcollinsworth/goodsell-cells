@@ -1,10 +1,21 @@
 import pytest
 from playwright.sync_api import sync_playwright
 
+def launch_browser(p, headless=True):
+    for channel in ["msedge", "chrome", None]:
+        try:
+            if channel:
+                return p.chromium.launch(channel=channel, headless=headless)
+            else:
+                return p.chromium.launch(headless=headless)
+        except Exception:
+            continue
+    raise RuntimeError("Could not launch browser")
+
 def test_pdb_complexes_and_sphere_counts(server):
     """Verify sphere counts, userData, and geometry construction of PDB models."""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = launch_browser(p)
         page = browser.new_page()
         page.goto(f"{server}/index.html")
         page.wait_for_function("() => window.app && window.app.scene")
@@ -72,7 +83,7 @@ def test_pdb_complexes_and_sphere_counts(server):
 def test_simulation_dynamics_logic(server):
     """Verify simulation state management, speed controls, pause toggling, and motion updates."""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = launch_browser(p)
         page = browser.new_page()
         page.goto(f"{server}/index.html")
         page.wait_for_function("() => window.app && window.app.simulation")
@@ -120,7 +131,7 @@ def test_simulation_dynamics_logic(server):
 def test_simulation_collision_physics(server):
     """Verify physics collision resolution between stationary and mobile molecules."""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = launch_browser(p)
         page = browser.new_page()
         page.goto(f"{server}/index.html")
         page.wait_for_function("() => window.app && window.app.simulation")

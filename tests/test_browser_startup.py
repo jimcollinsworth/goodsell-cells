@@ -2,13 +2,24 @@ import time
 import pytest
 from playwright.sync_api import sync_playwright
 
+def launch_browser(p, headless=True):
+    for channel in ["msedge", "chrome", None]:
+        try:
+            if channel:
+                return p.chromium.launch(channel=channel, headless=headless)
+            else:
+                return p.chromium.launch(headless=headless)
+        except Exception:
+            continue
+    raise RuntimeError("Could not launch browser")
+
 def test_startup_and_zero_console_errors(server):
     """Test browser startup and verify zero console errors or uncaught page exceptions."""
     console_errors = []
     page_errors = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = launch_browser(p)
         page = browser.new_page()
 
         page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
@@ -30,7 +41,7 @@ def test_startup_and_zero_console_errors(server):
 def test_sample_cell_loading_and_rendering(server):
     """Test canvas rendering, WebGL context, and presence of molecular meshes in default scene."""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = launch_browser(p)
         page = browser.new_page()
         page.goto(f"{server}/index.html")
         page.wait_for_selector("#canvas-container canvas")
@@ -80,7 +91,7 @@ def test_interactive_operations(server):
     page_errors = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = launch_browser(p)
         page = browser.new_page()
 
         page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)

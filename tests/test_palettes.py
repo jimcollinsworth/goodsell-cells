@@ -4,10 +4,21 @@ from playwright.sync_api import sync_playwright
 
 HEX_REGEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
+def launch_browser(p, headless=True):
+    for channel in ["msedge", "chrome", None]:
+        try:
+            if channel:
+                return p.chromium.launch(channel=channel, headless=headless)
+            else:
+                return p.chromium.launch(headless=headless)
+        except Exception:
+            continue
+    raise RuntimeError("Could not launch browser")
+
 def test_palette_definitions_structure(server):
     """Verify palette data structure directly in Python by fetching/evaluating in browser context."""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = launch_browser(p)
         page = browser.new_page()
         page.goto(f"{server}/index.html")
         page.wait_for_function("() => window.app && window.app.scene")
